@@ -48,7 +48,7 @@ export default function App() {
             <a href="#why-us" className="hover:text-white transition-colors">Why Us</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
             <a 
-              href="https://wa.me/14155552671?text=Hello%20BrewLab Specialty Roastery,%20I%20am%20interested%20in%20your%20services!" 
+              href="https://wa.me/919692093386?text=Hello%20BrewLab Specialty Roastery,%20I%20am%20interested%20in%20your%20services!" 
               target="_blank" 
               rel="noopener noreferrer"
               className="px-5 py-2.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold flex items-center space-x-2 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:scale-105 transition-all duration-200"
@@ -74,7 +74,7 @@ export default function App() {
             <a href="#why-us" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-slate-300 hover:text-white">Why Us</a>
             <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="block py-2 text-slate-300 hover:text-white">Pricing</a>
             <a 
-              href="https://wa.me/14155552671?text=Hello%20BrewLab Specialty Roastery,%20I%20am%20interested%20in%20your%20services!" 
+              href="https://wa.me/919692093386?text=Hello%20BrewLab Specialty Roastery,%20I%20am%20interested%20in%20your%20services!" 
               target="_blank" 
               rel="noopener noreferrer"
               className="inline-flex items-center space-x-2 px-6 py-2.5 rounded-full bg-emerald-500 text-white font-semibold shadow-md"
@@ -104,7 +104,7 @@ export default function App() {
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
-            href="https://wa.me/14155552671?text=Hello%20BrewLab Specialty Roastery,%20I%20am%20interested%20in%20your%20services!"
+            href="https://wa.me/919692093386?text=Hello%20BrewLab Specialty Roastery,%20I%20am%20interested%20in%20your%20services!"
             target="_blank"
             rel="noopener noreferrer"
             className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold text-base flex items-center justify-center space-x-3 shadow-xl shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:-translate-y-0.5 transition-all duration-200"
@@ -166,7 +166,7 @@ export default function App() {
                   Engineered for seamless efficiency and peak operational impact with direct verification.
                 </p>
                 <a 
-                  href="https://wa.me/14155552671?text=Hello%20BrewLab Specialty Roastery,%20I%20am%20interested%20in%20your%20services!" 
+                  href="https://wa.me/919692093386?text=Hello%20BrewLab Specialty Roastery,%20I%20am%20interested%20in%20your%20services!" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-indigo-400 text-sm font-semibold flex items-center group-hover:text-indigo-300"
@@ -191,7 +191,7 @@ export default function App() {
             Skip bureaucratic email threads. Speak directly with the BrewLab Specialty Roastery leadership team via WhatsApp right now.
           </p>
           <a
-            href="https://wa.me/14155552671?text=Hello%20BrewLab Specialty Roastery,%20I%20am%20interested%20in%20your%20services!"
+            href="https://wa.me/919692093386?text=Hello%20BrewLab Specialty Roastery,%20I%20am%20interested%20in%20your%20services!"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center space-x-3 px-8 py-4 rounded-xl bg-emerald-500 text-white font-bold text-lg shadow-xl shadow-emerald-500/25 hover:bg-emerald-400 hover:scale-105 transition-all duration-200"
@@ -212,7 +212,7 @@ export default function App() {
 
       {/* Persistent Floating WhatsApp Floating Action Button */}
       <a
-        href="https://wa.me/14155552671?text=Hello%20BrewLab Specialty Roastery,%20I%20am%20interested%20in%20your%20services!"
+        href="https://wa.me/919692093386?text=Hello%20BrewLab Specialty Roastery,%20I%20am%20interested%20in%20your%20services!"
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Direct WhatsApp Contact"

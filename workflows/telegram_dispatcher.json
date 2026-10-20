@@ -12,7 +12,7 @@
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
-      "position": [200, 300],
+      "position": [160, 360],
       "webhookId": "tg-webhook-dispatcher"
     },
     {
@@ -31,35 +31,7 @@
       "name": "Admin Security Gate",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [420, 300]
-    },
-    {
-      "parameters": {
-        "dataType": "string",
-        "value1": "={{ $json.message.text.split(' ')[0] }}",
-        "rules": {
-          "rules": [
-            {
-              "value2": "/status",
-              "output": 0
-            },
-            {
-              "value2": "/post",
-              "output": 1
-            },
-            {
-              "value2": "/buildsite",
-              "output": 2
-            }
-          ]
-        },
-        "fallbackOutput": 3
-      },
-      "id": "command-router-1",
-      "name": "Command Router",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3,
-      "position": [660, 240]
+      "position": [360, 360]
     },
     {
       "parameters": {
@@ -73,23 +45,70 @@
       "name": "Reject Unauthorized",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [660, 480]
+      "position": [580, 560]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT COUNT(*) AS total_posts, SUM(CASE WHEN status='published' THEN 1 ELSE 0 END) AS published_count FROM posts;"
+        "query": "=INSERT INTO executive_memory (memory_type, category, content, source, importance_score)\nVALUES (\n  'conversation',\n  'executive_log',\n  '{{ $json.message.text.replace(/'/g, \"''\") }}',\n  'telegram',\n  5\n);"
+      },
+      "id": "auto-save-memory",
+      "name": "Auto-Log to Executive Memory",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [580, 340]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $('Telegram Trigger').item.json.message.text.split(' ')[0] }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "/status",
+              "output": 0
+            },
+            {
+              "value2": "/post",
+              "output": 1
+            },
+            {
+              "value2": "/buildsite",
+              "output": 2
+            },
+            {
+              "value2": "/remember",
+              "output": 3
+            },
+            {
+              "value2": "/recall",
+              "output": 4
+            }
+          ]
+        },
+        "fallbackOutput": 5
+      },
+      "id": "command-router-1",
+      "name": "Command Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [800, 340]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) AS total_posts, SUM(CASE WHEN status='published' THEN 1 ELSE 0 END) AS published_count FROM posts;\nSELECT COUNT(*) AS memory_count FROM executive_memory;"
       },
       "id": "db-status-query",
       "name": "Query System Status",
       "type": "n8n-nodes-base.mySql",
       "typeVersion": 2.4,
-      "position": [900, 80]
+      "position": [1060, 60]
     },
     {
       "parameters": {
         "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
-        "text": "=⚡ *SYSTEM STATUS REPORT*\n\n🟢 *Core Orchestrator:* Online\n🗄️ *MySQL 8.0:* Connected\n🎥 *Media Engine:* Active (:8000)\n🌐 *Dev Bridge:* Active (:8050)\n\n📊 *Total Posts Tracked:* {{ $json.total_posts }}\n🚀 *Successfully Published:* {{ $json.published_count }}",
+        "text": "=⚡ *NOVA OPERATIONS INTELLIGENCE REPORT*\n\n🟢 *Identity:* Nova (Executive Chief of Staff)\n🏢 *Agency:* SocialAgent OS\n🗄️ *MySQL 8.0 Memory:* Connected & Active\n🧠 *Memories Stored:* {{ $json.memory_count || 0 }} directives\n\n📊 *Total Content Tracked:* {{ $json.total_posts || 0 }}\n🚀 *Successfully Published:* {{ $json.published_count || 0 }}\n🌐 *Dev Bridge:* Online (:8050)\n🎥 *Media Engine:* Online (:8000)",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -98,7 +117,7 @@
       "name": "Send Status Response",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1120, 80]
+      "position": [1280, 60]
     },
     {
       "parameters": {
@@ -109,7 +128,7 @@
       "name": "Trigger Social Pipeline",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1,
-      "position": [900, 240]
+      "position": [1060, 180]
     },
     {
       "parameters": {
@@ -124,12 +143,12 @@
       "name": "Trigger Dev Bridge",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 380]
+      "position": [1060, 300]
     },
     {
       "parameters": {
         "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
-        "text": "=🚀 *Autonomous Web Build Initiated!*\nTarget: *{{ $('Telegram Trigger').item.json.message.text.replace('/buildsite', '').trim() || 'Client Project' }}*\nAntigravity is scaffolding the Vite + React workspace. You will receive the live link once complete.",
+        "text": "=🚀 *Autonomous Web Build Initiated!*\nTarget: *{{ $('Telegram Trigger').item.json.message.text.replace('/buildsite', '').trim() || 'Client Project' }}*\nScaffolding modern Vite + React workspace. Live link will be dispatched shortly.",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
@@ -138,7 +157,97 @@
       "name": "Send Build Confirmation",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [1120, 380]
+      "position": [1280, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO executive_memory (memory_type, category, content, importance_score)\nVALUES (\n  'rule',\n  'executive_directive',\n  '{{ $('Telegram Trigger').item.json.message.text.replace('/remember', '').trim().replace(/'/g, \"''\") }}',\n  10\n);"
+      },
+      "id": "db-save-directive",
+      "name": "Save Executive Directive",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [1060, 420]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=🧠 *DIRECTIVE LOCKED INTO PERMANENT MEMORY*\n\n\"{{ $('Telegram Trigger').item.json.message.text.replace('/remember', '').trim() }}\"\n\nI have permanently recorded this rule in the MySQL executive memory bank. All future content, code, and operational decisions will abide by this instruction.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-confirm-remember",
+      "name": "Confirm Memory Saved",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1280, 420]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT content, memory_type, created_at \nFROM executive_memory \nWHERE content LIKE '%{{ $('Telegram Trigger').item.json.message.text.replace('/recall', '').trim().replace(/'/g, \"''\") }}%'\nORDER BY importance_score DESC, created_at DESC \nLIMIT 5;"
+      },
+      "id": "db-recall-memories",
+      "name": "Search Executive Memories",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [1060, 540]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=🔍 *RECALLED EXECUTIVE MEMORIES:*\n\n{{ $json.map((m, i) => `${i+1}. [${m.memory_type.toUpperCase()}] ${m.content} (${m.created_at})`).join('\\n\\n') || 'No specific memories found matching that query.' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-send-recalled-memories",
+      "name": "Send Recalled Memories",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1280, 540]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT content, memory_type FROM executive_memory ORDER BY importance_score DESC, created_at DESC LIMIT 10;"
+      },
+      "id": "db-get-top-memories",
+      "name": "Fetch Top Memories for Context",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [1060, 680]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are Nova, the Autonomous Chief of Staff & Operations Director for SocialAgent OS. You serve the Executive Director with total loyalty, precision, and relentless execution focus. Your core works span: 1. Zero-Cost Programmatic Media Engine (Edge-TTS, Pollinations, FFmpeg), 2. Multi-Platform Syndication (YouTube, IG, X), 3. WhatsApp Client Intake, 4. Autonomous Web Engineering Bridge, 5. 24h Analytics Optimization. Here is your memory bank of previous executive rules & context: {{ JSON.stringify($json) }}. The Executive Director says: '{{ $('Telegram Trigger').item.json.message.text }}'. Respond directly, professionally, concisely, and confirm how you will execute this.\"\n    }]\n  }]\n}",
+        "options": {}
+      },
+      "id": "gemini-conversational-nova",
+      "name": "Gemini Identity & Memory Engine",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1280, 680]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.candidates[0].content.parts[0].text }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-send-nova-reply",
+      "name": "Send Nova Response",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1500, 680]
     }
   ],
   "connections": {
@@ -157,7 +266,7 @@
       "main": [
         [
           {
-            "node": "Command Router",
+            "node": "Auto-Log to Executive Memory",
             "type": "main",
             "index": 0
           }
@@ -165,6 +274,17 @@
         [
           {
             "node": "Reject Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-Log to Executive Memory": {
+      "main": [
+        [
+          {
+            "node": "Command Router",
             "type": "main",
             "index": 0
           }
@@ -193,6 +313,27 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Save Executive Directive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Search Executive Memories",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Top Memories for Context",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -212,6 +353,50 @@
         [
           {
             "node": "Send Build Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Executive Directive": {
+      "main": [
+        [
+          {
+            "node": "Confirm Memory Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Executive Memories": {
+      "main": [
+        [
+          {
+            "node": "Send Recalled Memories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Top Memories for Context": {
+      "main": [
+        [
+          {
+            "node": "Gemini Identity & Memory Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Identity & Memory Engine": {
+      "main": [
+        [
+          {
+            "node": "Send Nova Response",
             "type": "main",
             "index": 0
           }

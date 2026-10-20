@@ -73,7 +73,26 @@ CREATE TABLE IF NOT EXISTS conversations (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
--- 4. Default Baseline Seed Data (Verification Sanity Check)
+-- 4. Table: executive_memory
+-- Long-term persistent memory for Executive Director directives, preferences, and rules
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS executive_memory (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    memory_type VARCHAR(50) NOT NULL DEFAULT 'directive', -- 'directive', 'preference', 'fact', 'conversation', 'rule'
+    category VARCHAR(50) NOT NULL DEFAULT 'general',       -- 'media', 'branding', 'clients', 'strategy'
+    context_key VARCHAR(150) NULL,
+    content TEXT NOT NULL,
+    source VARCHAR(50) DEFAULT 'telegram',
+    importance_score INT DEFAULT 5,                       -- 1 to 10
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_memory_type (memory_type),
+    INDEX idx_memory_category (category),
+    FULLTEXT idx_memory_search (content)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
+-- 5. Default Baseline Seed Data (Verification Sanity Check)
 -- ---------------------------------------------------------------------
 INSERT IGNORE INTO posts (id, platform, topic, hook, caption, status, scheduled_at, analytics_data)
 VALUES (
