@@ -1,0 +1,205 @@
+{
+  "name": "Social Media Content Pipeline & Review Gate",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "daily-cron-trigger",
+      "name": "Daily 9AM Cron",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [180, 260]
+    },
+    {
+      "parameters": {},
+      "id": "manual-subworkflow-trigger",
+      "name": "Manual / Dispatcher Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [180, 440]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an elite viral short-form video creator. Generate a high-retention 30-second video script about emerging autonomous AI tech. Return ONLY raw valid JSON with keys: topic, hook, script (around 65 words, punchy sentences), caption (with hashtags), visual_prompts (array of 4 vivid vertical background scene descriptions). Do not use markdown backticks.\"\n    }]\n  }]\n}",
+        "options": {}
+      },
+      "id": "gemini-script-gen",
+      "name": "Gemini Script & Prompt Generator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 340]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.candidates[0].content.parts[0].text;\nlet parsed;\ntry {\n  const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();\n  parsed = JSON.parse(cleanText);\n} catch (e) {\n  parsed = {\n    topic: \"Autonomous AI Agency Revolution\",\n    hook: \"Why manual business operations are dead in 2026\",\n    script: \"Running an agency used to take ten employees and five thousand dollars a month in SaaS tools. Today, autonomous AI systems handle lead intake, video production, and site deployment simultaneously. The future belongs to those who build zero-marginal-cost ecosystems.\",\n    caption: \"The autonomous business revolution is here. Are you adapting? 🚀 #ai #automation #tech #future #business\",\n    visual_prompts: [\n      \"Futuristic glowing AI brain core with fiber optic neon data streams\",\n      \"High tech modern digital control room with sleek glass UI monitors\",\n      \"Autonomous robotic assembly line crafting glowing holographic circuits\",\n      \"Minimalist dark executive penthouse office looking out at a cybernetic city skyline\"\n    ]\n  };\n}\nreturn parsed;"
+      },
+      "id": "parse-llm-json",
+      "name": "Clean & Parse AI Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 340]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://media-engine:8000/api/generate-full-video",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"script\": \"{{ $json.script }}\",\n  \"visual_prompts\": {{ JSON.stringify($json.visual_prompts) }},\n  \"voice\": \"christopher\"\n}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "render-video-call",
+      "name": "Call Media Engine (:8000)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 340]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO posts (platform, topic, hook, caption, media_path, status, scheduled_at)\nVALUES (\n  'all',\n  '{{ $('Clean & Parse AI Output').item.json.topic.replace(/'/g, \"''\") }}',\n  '{{ $('Clean & Parse AI Output').item.json.hook.replace(/'/g, \"''\") }}',\n  '{{ $('Clean & Parse AI Output').item.json.caption.replace(/'/g, \"''\") }}',\n  '{{ $json.video_path }}',\n  'pending_approval',\n  DATE_ADD(NOW(), INTERVAL 2 HOUR)\n);\nSELECT LAST_INSERT_ID() as post_id;"
+      },
+      "id": "db-insert-post",
+      "name": "Record in MySQL posts Table",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [1160, 340]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_ADMIN_ID }}",
+        "text": "=🎬 *NEW ASSET DRAFT READY FOR EXECUTIVE REVIEW*\n\n📌 *Topic:* {{ $('Clean & Parse AI Output').item.json.topic }}\n🪝 *Hook:* \"{{ $('Clean & Parse AI Output').item.json.hook }}\"\n\n📝 *Caption:*\n{{ $('Clean & Parse AI Output').item.json.caption }}\n\n⏱️ *Duration:* {{ $('Call Media Engine (:8000)').item.json.duration_seconds }}s | *Size:* {{ $('Call Media Engine (:8000)').item.json.file_size_mb }}MB\n📁 *File:* `{{ $('Call Media Engine (:8000)').item.json.video_filename }}`\n\n*Action Required:* Review draft preview above and select an executive action:",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": [
+                {
+                  "text": "✅ Approve & Post",
+                  "additionalFields": {
+                    "callback_data": "=approve_{{ $json.post_id }}"
+                  }
+                },
+                {
+                  "text": "✏️ Edit Caption",
+                  "additionalFields": {
+                    "callback_data": "=edit_{{ $json.post_id }}"
+                  }
+                }
+              ]
+            },
+            {
+              "row": [
+                {
+                  "text": "🔄 Regenerate",
+                  "additionalFields": {
+                    "callback_data": "=regen_{{ $json.post_id }}"
+                  }
+                },
+                {
+                  "text": "💡 Suggest Next Step",
+                  "additionalFields": {
+                    "callback_data": "=suggest_{{ $json.post_id }}"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-send-approval-card",
+      "name": "Send Interactive Telegram Card",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1400, 340]
+    }
+  ],
+  "connections": {
+    "Daily 9AM Cron": {
+      "main": [
+        [
+          {
+            "node": "Gemini Script & Prompt Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual / Dispatcher Trigger": {
+      "main": [
+        [
+          {
+            "node": "Gemini Script & Prompt Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Script & Prompt Generator": {
+      "main": [
+        [
+          {
+            "node": "Clean & Parse AI Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean & Parse AI Output": {
+      "main": [
+        [
+          {
+            "node": "Call Media Engine (:8000)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Media Engine (:8000)": {
+      "main": [
+        [
+          {
+            "node": "Record in MySQL posts Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record in MySQL posts Table": {
+      "main": [
+        [
+          {
+            "node": "Send Interactive Telegram Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

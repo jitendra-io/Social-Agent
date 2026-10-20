@@ -1,0 +1,225 @@
+{
+  "name": "Telegram Executive Command Dispatcher",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "tg-trigger-1",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "webhookId": "tg-webhook-dispatcher"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.message.from.id }}",
+              "operation": "equal",
+              "value2": "={{ $env.TELEGRAM_ADMIN_ID }}"
+            }
+          ]
+        }
+      },
+      "id": "security-filter-1",
+      "name": "Admin Security Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.message.text.split(' ')[0] }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "/status",
+              "output": 0
+            },
+            {
+              "value2": "/post",
+              "output": 1
+            },
+            {
+              "value2": "/buildsite",
+              "output": 2
+            }
+          ]
+        },
+        "fallbackOutput": 3
+      },
+      "id": "command-router-1",
+      "name": "Command Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [660, 240]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "🛡️ *ACCESS DENIED*\nUnauthorized sender ID detected. Commands are restricted exclusively to the Executive Director.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "reject-msg-1",
+      "name": "Reject Unauthorized",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [660, 480]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) AS total_posts, SUM(CASE WHEN status='published' THEN 1 ELSE 0 END) AS published_count FROM posts;"
+      },
+      "id": "db-status-query",
+      "name": "Query System Status",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [900, 80]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=⚡ *SYSTEM STATUS REPORT*\n\n🟢 *Core Orchestrator:* Online\n🗄️ *MySQL 8.0:* Connected\n🎥 *Media Engine:* Active (:8000)\n🌐 *Dev Bridge:* Active (:8050)\n\n📊 *Total Posts Tracked:* {{ $json.total_posts }}\n🚀 *Successfully Published:* {{ $json.published_count }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-send-status",
+      "name": "Send Status Response",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1120, 80]
+    },
+    {
+      "parameters": {
+        "workflowId": "social-pipeline-workflow",
+        "options": {}
+      },
+      "id": "trigger-post-pipeline",
+      "name": "Trigger Social Pipeline",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [900, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8050/build-website",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"client_name\": \"{{ $('Telegram Trigger').item.json.message.text.replace('/buildsite', '').trim() || 'Client Project' }}\",\n  \"niche\": \"Enterprise Solutions\",\n  \"callback_url\": \"{{ $env.WEBHOOK_URL }}webhook/build-complete\"\n}",
+        "options": {}
+      },
+      "id": "trigger-dev-bridge",
+      "name": "Trigger Dev Bridge",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 380]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=🚀 *Autonomous Web Build Initiated!*\nTarget: *{{ $('Telegram Trigger').item.json.message.text.replace('/buildsite', '').trim() || 'Client Project' }}*\nAntigravity is scaffolding the Vite + React workspace. You will receive the live link once complete.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-confirm-build",
+      "name": "Send Build Confirmation",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1120, 380]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Admin Security Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin Security Gate": {
+      "main": [
+        [
+          {
+            "node": "Command Router",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Command Router": {
+      "main": [
+        [
+          {
+            "node": "Query System Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Trigger Social Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Trigger Dev Bridge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query System Status": {
+      "main": [
+        [
+          {
+            "node": "Send Status Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Dev Bridge": {
+      "main": [
+        [
+          {
+            "node": "Send Build Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

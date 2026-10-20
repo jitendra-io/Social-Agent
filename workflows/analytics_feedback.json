@@ -1,0 +1,100 @@
+{
+  "name": "24-Hour Social Feedback & Strategic Advisory Loop",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 21 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-24h-analytics",
+      "name": "24-Hour Analytics Cron (9 PM)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [180, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, topic, hook, caption, post_external_ids, analytics_data, published_at \nFROM posts \nWHERE status = 'published' \nORDER BY published_at DESC \nLIMIT 5;"
+      },
+      "id": "db-query-published-posts",
+      "name": "Fetch Recent Published Posts",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are a Chief Marketing Analytics Officer. Review these recent published assets and metrics: {{ JSON.stringify($('Fetch Recent Published Posts').all().map(i => i.json)) }}. Provide a high-impact Executive Debrief for Telegram with 3 sections: 1. Top Performing Hook & Core Takeaway, 2. Audience Retention Observations, 3. Immediate Recommended Action (e.g. repurpose into carousel, expand into YouTube long-form, re-angle hook for tomorrow). Keep it concise, punchy, and formatted with clean Markdown.\"\n    }]\n  }]\n}",
+        "options": {}
+      },
+      "id": "gemini-analytics-evaluator",
+      "name": "Gemini Strategic Analytics Evaluation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_ADMIN_ID }}",
+        "text": "=📊 *24-HOUR EXECUTIVE PERFORMANCE DEBRIEF*\n\n{{ $json.candidates[0].content.parts[0].text }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-send-analytics-brief",
+      "name": "Send Debrief to Executive Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [920, 300]
+    }
+  ],
+  "connections": {
+    "24-Hour Analytics Cron (9 PM)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Recent Published Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Recent Published Posts": {
+      "main": [
+        [
+          {
+            "node": "Gemini Strategic Analytics Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Strategic Analytics Evaluation": {
+      "main": [
+        [
+          {
+            "node": "Send Debrief to Executive Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,123 @@
+version: '3.8'
+
+# =====================================================================
+# AUTONOMOUS AI DIGITAL AGENCY & OPERATIONS OS - DOCKER ORCHESTRATION
+# =====================================================================
+
+networks:
+  agency-net:
+    driver: bridge
+    name: agency-net
+
+services:
+  # -------------------------------------------------------------------
+  # 1. DATABASE: MySQL 8.0 (InnoDB + Native JSON)
+  # -------------------------------------------------------------------
+  database:
+    image: mysql:8.0
+    container_name: agency-database
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-agency_root_secure_password_replace_me}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-agency_db}
+      MYSQL_USER: ${MYSQL_USER:-agency_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-agency_user_password_replace_me}
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - agency-net
+
+  # -------------------------------------------------------------------
+  # 2. MEDIA ENGINE: Python 3.11 Microservice (Edge-TTS, FFmpeg, FLUX)
+  # -------------------------------------------------------------------
+  media-engine:
+    build:
+      context: ./services/media_engine
+      dockerfile: Dockerfile
+    container_name: agency-media-engine
+    restart: unless-stopped
+    ports:
+      - "${MEDIA_ENGINE_PORT:-8000}:8000"
+    environment:
+      SHARED_MEDIA_DIR: /app/output
+      DEFAULT_VOICE_MODEL: ${DEFAULT_VOICE_MODEL:-en-US-ChristopherNeural}
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - ./shared_media:/app/output
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - agency-net
+
+  # -------------------------------------------------------------------
+  # 3. ORCHESTRATOR: n8n Workflow Automation Platform
+  # -------------------------------------------------------------------
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: agency-n8n
+    restart: unless-stopped
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    environment:
+      # General n8n Configuration
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
+      WEBHOOK_URL: ${WEBHOOK_URL:-http://localhost:5678/}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: ${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS:-true}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-UTC}
+      N8N_DEFAULT_BINARY_DATA_MODE: filesystem
+      
+      # Database storage for n8n internal workflows & credentials
+      DB_TYPE: mysqldb
+      DB_MYSQLDB_HOST: database
+      DB_MYSQLDB_PORT: 3306
+      DB_MYSQLDB_DATABASE: ${MYSQL_DATABASE:-agency_db}
+      DB_MYSQLDB_USER: ${MYSQL_USER:-agency_user}
+      DB_MYSQLDB_PASSWORD: ${MYSQL_PASSWORD:-agency_user_password_replace_me}
+
+      # Pass-through database credentials for n8n custom workflow MySQL nodes
+      MYSQL_HOST: database
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-agency_db}
+      MYSQL_USER: ${MYSQL_USER:-agency_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-agency_user_password_replace_me}
+
+      # Pass-through keys accessible to n8n nodes & expressions
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ADMIN_ID: ${TELEGRAM_ADMIN_ID:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      MEDIA_ENGINE_URL: http://media-engine:8000
+      DEV_BRIDGE_URL: http://host.docker.internal:8050
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+      - ./shared_media:/data/shared
+    depends_on:
+      database:
+        condition: service_healthy
+      media-engine:
+        condition: service_started
+    networks:
+      - agency-net

@@ -1,0 +1,274 @@
+{
+  "name": "WhatsApp Inbound Lead Qualifier & Build Bridge",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wa-webhook-get",
+      "name": "Meta Webhook Verification (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 200],
+      "webhookId": "whatsapp-verification"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {}
+      },
+      "id": "respond-challenge",
+      "name": "Return Challenge Token",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [420, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-webhook",
+        "options": {}
+      },
+      "id": "wa-webhook-post",
+      "name": "Meta Inbound Messages (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 420],
+      "webhookId": "whatsapp-messages"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\ntry {\n  const entry = body.entry[0];\n  const change = entry.changes[0];\n  const value = change.value;\n  \n  if (value.messages && value.messages.length > 0) {\n    const msg = value.messages[0];\n    return {\n      phone: msg.from,\n      message_id: msg.id,\n      text: msg.text ? msg.text.body : '',\n      timestamp: msg.timestamp,\n      profile_name: value.contacts ? value.contacts[0].profile.name : 'Prospect'\n    };\n  }\n} catch (e) {}\nreturn [];"
+      },
+      "id": "parse-wa-payload",
+      "name": "Parse WhatsApp Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 420]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT id, business_name, site_status, requirements FROM leads WHERE phone = '{{ $json.phone }}' LIMIT 1;"
+      },
+      "id": "db-get-lead",
+      "name": "Fetch Lead from MySQL",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [660, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an intelligent agency client intake consultant. A prospect sent this message: '{{ $('Parse WhatsApp Message').item.json.text }}'. Previous known data: {{ JSON.stringify($json) }}. Your goal is to gather: 1. Business Name, 2. Niche, 3. 3-4 Key Services/Features, 4. Brand Aesthetic/Colors. If all 4 are present, respond with JSON starting with COMPLETE: {\"client_name\": \"...\", \"niche\": \"...\", \"features\": [...], \"colors\": \"...\"}. Otherwise, write a polite, concise conversational reply (under 40 words) asking for the missing detail.\"\n    }]\n  }]\n}",
+        "options": {}
+      },
+      "id": "gemini-lead-ai",
+      "name": "Gemini Conversational Qualifier",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 420]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.candidates[0].content.parts[0].text }}",
+              "operation": "contains",
+              "value2": "COMPLETE:"
+            }
+          ]
+        }
+      },
+      "id": "check-qualification-complete",
+      "name": "Is Brief Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1140, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.candidates[0].content.parts[0].text;\nconst jsonStr = text.replace('COMPLETE:', '').trim();\nconst brief = JSON.parse(jsonStr);\nreturn {\n  ...brief,\n  phone: $('Parse WhatsApp Message').item.json.phone\n};"
+      },
+      "id": "extract-brief-json",
+      "name": "Extract Structured Brief",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1380, 320]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO leads (business_name, phone, industry_niche, requirements, site_status)\nVALUES (\n  '{{ $json.client_name.replace(/'/g, \"''\") }}',\n  '{{ $json.phone }}',\n  '{{ $json.niche.replace(/'/g, \"''\") }}',\n  '{{ JSON.stringify($json.features) }}',\n  'ready_for_build'\n)\nON DUPLICATE KEY UPDATE \n  business_name = '{{ $json.client_name.replace(/'/g, \"''\") }}',\n  industry_niche = '{{ $json.niche.replace(/'/g, \"''\") }}',\n  requirements = '{{ JSON.stringify($json.features) }}',\n  site_status = 'ready_for_build';"
+      },
+      "id": "db-save-qualified-lead",
+      "name": "Save Lead in MySQL",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [1600, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8050/build-website",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"client_name\": \"{{ $('Extract Structured Brief').item.json.client_name }}\",\n  \"niche\": \"{{ $('Extract Structured Brief').item.json.niche }}\",\n  \"features\": {{ JSON.stringify($('Extract Structured Brief').item.json.features) }},\n  \"phone\": \"{{ $('Extract Structured Brief').item.json.phone }}\",\n  \"callback_url\": \"{{ $env.WEBHOOK_URL }}webhook/build-complete\"\n}",
+        "options": {}
+      },
+      "id": "trigger-dev-bridge-build",
+      "name": "Dispatch to Dev Bridge (:8050)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1820, 320]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_ADMIN_ID }}",
+        "text": "=🔔 *NEW QUALIFIED WHATSAPP LEAD!*\n\n🏢 *Business:* {{ $('Extract Structured Brief').item.json.client_name }}\n📱 *Phone:* {{ $('Extract Structured Brief').item.json.phone }}\n🎯 *Niche:* {{ $('Extract Structured Brief').item.json.niche }}\n\n⚙️ Autonomous Dev Bridge build initiated. Live preview link will follow.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-lead-alert",
+      "name": "Alert Executive on Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2040, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Parse WhatsApp Message').item.json.phone }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"{{ $json.candidates[0].content.parts[0].text.replace(/'/g, \"\\\\'\") }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "wa-reply-prospect",
+      "name": "Send Reply on WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 520]
+    }
+  ],
+  "connections": {
+    "Meta Webhook Verification (GET)": {
+      "main": [
+        [
+          {
+            "node": "Return Challenge Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta Inbound Messages (POST)": {
+      "main": [
+        [
+          {
+            "node": "Parse WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse WhatsApp Message": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead from MySQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead from MySQL": {
+      "main": [
+        [
+          {
+            "node": "Gemini Conversational Qualifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Conversational Qualifier": {
+      "main": [
+        [
+          {
+            "node": "Is Brief Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Brief Ready?": {
+      "main": [
+        [
+          {
+            "node": "Extract Structured Brief",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Reply on WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Structured Brief": {
+      "main": [
+        [
+          {
+            "node": "Save Lead in MySQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Lead in MySQL": {
+      "main": [
+        [
+          {
+            "node": "Dispatch to Dev Bridge (:8050)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch to Dev Bridge (:8050)": {
+      "main": [
+        [
+          {
+            "node": "Alert Executive on Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

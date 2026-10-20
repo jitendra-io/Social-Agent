@@ -1,0 +1,289 @@
+{
+  "name": "Telegram Callback Query Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "id": "tg-callback-trigger",
+      "name": "Telegram Callback Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [180, 320],
+      "webhookId": "tg-webhook-callbacks"
+    },
+    {
+      "parameters": {
+        "operation": "answerCallbackQuery",
+        "callbackQueryId": "={{ $json.callback_query.id }}",
+        "additionalFields": {
+          "text": "Action acknowledged by Orchestrator."
+        }
+      },
+      "id": "answer-callback",
+      "name": "Acknowledge Callback Query",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [400, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json.callback_query.data || '';\nconst parts = data.split('_');\nconst action = parts[0];\nconst postId = parts[1] || null;\n\nreturn {\n  action: action,\n  post_id: postId,\n  chat_id: $json.callback_query.message.chat.id,\n  from_id: $json.callback_query.from.id\n};"
+      },
+      "id": "parse-action",
+      "name": "Parse Action & Post ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [620, 320]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.action }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "approve",
+              "output": 0
+            },
+            {
+              "value2": "edit",
+              "output": 1
+            },
+            {
+              "value2": "regen",
+              "output": 2
+            },
+            {
+              "value2": "suggest",
+              "output": 3
+            }
+          ]
+        }
+      },
+      "id": "switch-actions",
+      "name": "Route Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [860, 320]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE posts SET status='approved' WHERE id = {{ $json.post_id }};"
+      },
+      "id": "db-approve-post",
+      "name": "Approve in MySQL",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [1120, 120]
+    },
+    {
+      "parameters": {
+        "workflowId": "social-publisher-workflow",
+        "options": {}
+      },
+      "id": "trigger-publisher",
+      "name": "Trigger Publisher Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1340, 120]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO conversations (session_id, user_id, platform, last_state, metadata)\nVALUES (\n  'tg_{{ $json.from_id }}',\n  '{{ $json.from_id }}',\n  'telegram',\n  'awaiting_caption_edit',\n  JSON_OBJECT('target_post_id', {{ $json.post_id }})\n)\nON DUPLICATE KEY UPDATE \n  last_state='awaiting_caption_edit',\n  metadata=JSON_OBJECT('target_post_id', {{ $json.post_id }});"
+      },
+      "id": "db-set-edit-state",
+      "name": "Set Edit State in MySQL",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [1120, 260]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Parse Action & Post ID').item.json.chat_id }}",
+        "text": "=✏️ *EDIT CAPTION MODE ACTIVATED*\nReply directly with your revised caption and hashtags. The orchestrator will update post #{{ $('Parse Action & Post ID').item.json.post_id }} immediately.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-prompt-caption",
+      "name": "Prompt For Caption",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1340, 260]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Parse Action & Post ID').item.json.chat_id }}",
+        "text": "=🔄 *REGENERATING ASSET*\nRetriggering media pipeline with alternative visual seeds for post #{{ $('Parse Action & Post ID').item.json.post_id }}. You will receive a new card shortly.",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-regen-notify",
+      "name": "Notify Regeneration",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=SELECT topic, hook, caption FROM posts WHERE id = {{ $json.post_id }} LIMIT 1;"
+      },
+      "id": "db-fetch-for-suggest",
+      "name": "Fetch Post for Suggestion",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [1120, 540]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Analyze this short video concept: Topic: '{{ $json.topic }}', Hook: '{{ $json.hook }}'. Suggest 3 concrete cross-platform growth strategies (e.g. turning it into an X thread, LinkedIn document carousel, or long-form YouTube breakdown). Keep bullet points concise and actionable.\"\n    }]\n  }]\n}",
+        "options": {}
+      },
+      "id": "gemini-strategic-suggest",
+      "name": "Gemini Strategic Advisory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 540]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Parse Action & Post ID').item.json.chat_id }}",
+        "text": "=💡 *STRATEGIC NEXT STEPS & REPURPOSING*\n\n{{ $json.candidates[0].content.parts[0].text }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-send-suggestions",
+      "name": "Send AI Strategy",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1560, 540]
+    }
+  ],
+  "connections": {
+    "Telegram Callback Trigger": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Callback Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge Callback Query": {
+      "main": [
+        [
+          {
+            "node": "Parse Action & Post ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Action & Post ID": {
+      "main": [
+        [
+          {
+            "node": "Route Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Action": {
+      "main": [
+        [
+          {
+            "node": "Approve in MySQL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Edit State in MySQL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Regeneration",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Post for Suggestion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approve in MySQL": {
+      "main": [
+        [
+          {
+            "node": "Trigger Publisher Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Edit State in MySQL": {
+      "main": [
+        [
+          {
+            "node": "Prompt For Caption",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Post for Suggestion": {
+      "main": [
+        [
+          {
+            "node": "Gemini Strategic Advisory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Strategic Advisory": {
+      "main": [
+        [
+          {
+            "node": "Send AI Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
