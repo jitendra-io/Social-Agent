@@ -61,10 +61,10 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://graph.facebook.com/v19.0/{{ $env.INSTAGRAM_ACCOUNT_ID }}/media",
+        "url": "=https://graph.instagram.com/v19.0/{{ $env.INSTAGRAM_ACCOUNT_ID }}/media",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"media_type\": \"REELS\",\n  \"caption\": \"{{ $('Fetch Approved Post from MySQL').item.json.caption }}\",\n  \"share_to_feed\": true\n}",
+        "jsonBody": "={\n  \"media_type\": \"REELS\",\n  \"video_url\": \"{{ $env.WEBHOOK_URL }}output/{{ $('Fetch Approved Post from MySQL').item.json.media_path.split('/').pop() }}\",\n  \"caption\": \"{{ $('Fetch Approved Post from MySQL').item.json.caption }}\",\n  \"share_to_feed\": true,\n  \"access_token\": \"{{ $env.INSTAGRAM_ACCESS_TOKEN }}\"\n}",
         "options": {}
       },
       "id": "ig-create-container",

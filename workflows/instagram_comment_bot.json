@@ -1,0 +1,204 @@
+{
+  "name": "Instagram Reel Comment Auto-Responder",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "instagram-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ig-webhook-get",
+      "name": "Meta Webhook Verification (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 200],
+      "webhookId": "instagram-verification"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": {}
+      },
+      "id": "respond-challenge-ig",
+      "name": "Return Challenge Token",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [420, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "instagram-webhook",
+        "options": {}
+      },
+      "id": "ig-webhook-post",
+      "name": "Meta Inbound Comments (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 420],
+      "webhookId": "instagram-comments"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\ntry {\n  const entries = body.entry || [];\n  for (const entry of entries) {\n    const changes = entry.changes || [];\n    for (const change of changes) {\n      if (change.field === 'comments') {\n        const val = change.value || {};\n        const myId = $env.INSTAGRAM_ACCOUNT_ID;\n        \n        // Prevent replying to own account comments\n        if (val.from && val.from.id !== myId && val.text) {\n          return [{\n            json: {\n              comment_id: val.id,\n              comment_text: val.text,\n              from_username: val.from.username || 'user',\n              from_id: val.from.id,\n              media_id: val.media ? val.media.id : null\n            }\n          }];\n        }\n      }\n    }\n  }\n} catch (e) {}\nreturn [];"
+      },
+      "id": "parse-ig-comment",
+      "name": "Parse Reel Comment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are Nova, the AI Community Manager & Executive Chief of Staff for SocialAgent OS (@spendwith.ai). A viewer commented on our Reel: '{{ $json.comment_text }}'. Write a warm, punchy, engaging, and friendly reply in under 20 words with 1 emoji. If they ask about services or pricing, encourage them to DM us or visit spendwith.ai. Return ONLY the reply text.\"\n    }]\n  }]\n}",
+        "options": {
+          "neverError": true
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "gemini-comment-reply",
+      "name": "Generate AI Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawReply = $json.candidates?.[0]?.content?.parts?.[0]?.text;\nconst fallback = 'Thanks for tuning in! Appreciate your support 🚀';\nconst reply = (rawReply || fallback).trim().replace(/^\"|\"$/g, '');\n\nconst item = $('Parse Reel Comment').item.json;\nreturn {\n  comment_id: item.comment_id,\n  comment_text: item.comment_text,\n  from_username: item.from_username,\n  from_id: item.from_id,\n  media_id: item.media_id,\n  reply_text: reply\n};"
+      },
+      "id": "format-reply-clean",
+      "name": "Clean & Format Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.instagram.com/v19.0/{{ $json.comment_id }}/replies",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": \"{{ $json.reply_text }}\",\n  \"access_token\": \"{{ $env.INSTAGRAM_ACCESS_TOKEN }}\"\n}",
+        "options": {}
+      },
+      "id": "post-ig-reply",
+      "name": "Post Reply to Instagram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 420]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO executive_memory (memory_type, category, content, source, importance_score)\nVALUES (\n  'social_interaction',\n  'instagram_comment',\n  'Replied to @{{ $('Clean & Format Reply').item.json.from_username }} on Reel: \"{{ $('Clean & Format Reply').item.json.comment_text.replace(/'/g, \"''\") }}\" -> \"{{ $('Clean & Format Reply').item.json.reply_text.replace(/'/g, \"''\") }}\"',\n  'instagram',\n  6\n);"
+      },
+      "id": "db-log-comment",
+      "name": "Log to MySQL Memory",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [1320, 420]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_ADMIN_ID }}",
+        "text": "=💬 *INSTAGRAM REEL COMMENT REPLIED!* 🚀\n\n👤 *User:* `@{{ $('Clean & Format Reply').item.json.from_username }}`\n📝 *Comment:* \"{{ $('Clean & Format Reply').item.json.comment_text }}\"\n\n🤖 *Nova Reply:* \n\"{{ $('Clean & Format Reply').item.json.reply_text }}\"",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-notify-comment",
+      "name": "Notify Telegram Admin",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1540, 420]
+    }
+  ],
+  "connections": {
+    "Meta Webhook Verification (GET)": {
+      "main": [
+        [
+          {
+            "node": "Return Challenge Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta Inbound Comments (POST)": {
+      "main": [
+        [
+          {
+            "node": "Parse Reel Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Reel Comment": {
+      "main": [
+        [
+          {
+            "node": "Generate AI Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate AI Reply": {
+      "main": [
+        [
+          {
+            "node": "Clean & Format Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean & Format Reply": {
+      "main": [
+        [
+          {
+            "node": "Post Reply to Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Reply to Instagram": {
+      "main": [
+        [
+          {
+            "node": "Log to MySQL Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to MySQL Memory": {
+      "main": [
+        [
+          {
+            "node": "Notify Telegram Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
