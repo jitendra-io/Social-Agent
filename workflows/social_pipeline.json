@@ -33,8 +33,11 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an elite viral short-form video creator. Generate a high-retention 30-second video script about emerging autonomous AI tech. Return ONLY raw valid JSON with keys: topic, hook, script (around 65 words, punchy sentences), caption (with hashtags), visual_prompts (array of 4 vivid vertical background scene descriptions). Do not use markdown backticks.\"\n    }]\n  }]\n}",
-        "options": {}
+        "options": {
+          "neverError": true
+        }
       },
+      "onError": "continueRegularOutput",
       "id": "gemini-script-gen",
       "name": "Gemini Script & Prompt Generator",
       "type": "n8n-nodes-base.httpRequest",
@@ -43,7 +46,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const text = $json.candidates[0].content.parts[0].text;\nlet parsed;\ntry {\n  const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();\n  parsed = JSON.parse(cleanText);\n} catch (e) {\n  parsed = {\n    topic: \"Autonomous AI Agency Revolution\",\n    hook: \"Why manual business operations are dead in 2026\",\n    script: \"Running an agency used to take ten employees and five thousand dollars a month in SaaS tools. Today, autonomous AI systems handle lead intake, video production, and site deployment simultaneously. The future belongs to those who build zero-marginal-cost ecosystems.\",\n    caption: \"The autonomous business revolution is here. Are you adapting? 🚀 #ai #automation #tech #future #business\",\n    visual_prompts: [\n      \"Futuristic glowing AI brain core with fiber optic neon data streams\",\n      \"High tech modern digital control room with sleek glass UI monitors\",\n      \"Autonomous robotic assembly line crafting glowing holographic circuits\",\n      \"Minimalist dark executive penthouse office looking out at a cybernetic city skyline\"\n    ]\n  };\n}\nreturn parsed;"
+        "jsCode": "const text = $json.candidates?.[0]?.content?.parts?.[0]?.text;\nlet parsed;\ntry {\n  const cleanText = (text || '').replace(/```json/g, '').replace(/```/g, '').trim();\n  parsed = JSON.parse(cleanText);\n} catch (e) {\n  parsed = {\n    topic: \"Autonomous AI Agency Revolution\",\n    hook: \"Why manual business operations are dead in 2026\",\n    script: \"Running an agency used to take ten employees and five thousand dollars a month in SaaS tools. Today, autonomous AI systems handle lead intake, video production, and site deployment simultaneously. The future belongs to those who build zero-marginal-cost ecosystems.\",\n    caption: \"The autonomous business revolution is here. Are you adapting? 🚀 #ai #automation #tech #future #business\",\n    visual_prompts: [\n      \"Futuristic glowing AI brain core with fiber optic neon data streams\",\n      \"High tech modern digital control room with sleek glass UI monitors\",\n      \"Autonomous robotic assembly line crafting glowing holographic circuits\",\n      \"Minimalist dark executive penthouse office looking out at a cybernetic city skyline\"\n    ]\n  };\n}\nreturn parsed;"
       },
       "id": "parse-llm-json",
       "name": "Clean & Parse AI Output",
