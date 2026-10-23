@@ -29,7 +29,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an elite viral short-form video creator. Generate a high-retention 30-second video script about emerging autonomous AI tech. Return ONLY raw valid JSON with keys: topic, hook, script (around 65 words, punchy sentences), caption (with hashtags), visual_prompts (array of 4 vivid vertical background scene descriptions). Do not use markdown backticks.\"\n    }]\n  }]\n}",

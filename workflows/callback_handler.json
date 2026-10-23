@@ -145,7 +145,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Analyze this short video concept: Topic: '{{ $json.topic }}', Hook: '{{ $json.hook }}'. Suggest 3 concrete cross-platform growth strategies (e.g. turning it into an X thread, LinkedIn document carousel, or long-form YouTube breakdown). Keep bullet points concise and actionable.\"\n    }]\n  }]\n}",

@@ -1,5 +1,3 @@
-version: '3.8'
-
 # =====================================================================
 # AUTONOMOUS AI DIGITAL AGENCY & OPERATIONS OS - DOCKER ORCHESTRATION
 # =====================================================================
@@ -18,7 +16,7 @@ services:
     container_name: agency-database
     restart: unless-stopped
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "3307:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-agency_root_secure_password_replace_me}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-agency_db}
@@ -83,6 +81,8 @@ services:
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: ${N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS:-true}
       GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-UTC}
       N8N_DEFAULT_BINARY_DATA_MODE: filesystem
+      N8N_PROXY_HOPS: 1
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       
       # Database storage for n8n internal workflows & credentials
       DB_TYPE: mysqldb

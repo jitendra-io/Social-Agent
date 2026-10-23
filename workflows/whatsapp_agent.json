@@ -64,7 +64,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an intelligent agency client intake consultant. A prospect sent this message: '{{ $('Parse WhatsApp Message').item.json.text }}'. Previous known data: {{ JSON.stringify($json) }}. Your goal is to gather: 1. Business Name, 2. Niche, 3. 3-4 Key Services/Features, 4. Brand Aesthetic/Colors. If all 4 are present, respond with JSON starting with COMPLETE: {\"client_name\": \"...\", \"niche\": \"...\", \"features\": [...], \"colors\": \"...\"}. Otherwise, write a polite, concise conversational reply (under 40 words) asking for the missing detail.\"\n    }]\n  }]\n}",

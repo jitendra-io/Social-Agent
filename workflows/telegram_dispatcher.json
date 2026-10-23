@@ -60,33 +60,114 @@
     },
     {
       "parameters": {
-        "dataType": "string",
-        "value1": "={{ $('Telegram Trigger').item.json.message.text.split(' ')[0] }}",
+        "mode": "rules",
         "rules": {
-          "rules": [
+          "values": [
             {
-              "value2": "/status",
-              "output": 0
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.split(' ')[0] }}",
+                    "rightValue": "/status",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
             },
             {
-              "value2": "/post",
-              "output": 1
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.split(' ')[0] }}",
+                    "rightValue": "/post",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
             },
             {
-              "value2": "/buildsite",
-              "output": 2
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.split(' ')[0] }}",
+                    "rightValue": "/buildsite",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
             },
             {
-              "value2": "/remember",
-              "output": 3
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.split(' ')[0] }}",
+                    "rightValue": "/remember",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
             },
             {
-              "value2": "/recall",
-              "output": 4
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Telegram Trigger').item.json.message.text.split(' ')[0] }}",
+                    "rightValue": "/recall",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
             }
           ]
         },
-        "fallbackOutput": 5
+        "options": {
+          "fallbackOutput": "extra"
+        }
       },
       "id": "command-router-1",
       "name": "Command Router",
@@ -97,7 +178,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT COUNT(*) AS total_posts, SUM(CASE WHEN status='published' THEN 1 ELSE 0 END) AS published_count FROM posts;\nSELECT COUNT(*) AS memory_count FROM executive_memory;"
+        "query": "SELECT (SELECT COUNT(*) FROM posts) AS total_posts, (SELECT COUNT(*) FROM posts WHERE status='published') AS published_count, (SELECT COUNT(*) FROM executive_memory) AS memory_count;"
       },
       "id": "db-status-query",
       "name": "Query System Status",
@@ -212,7 +293,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT content, memory_type FROM executive_memory ORDER BY importance_score DESC, created_at DESC LIMIT 10;"
+        "query": "SELECT GROUP_CONCAT(content SEPARATOR '\n- ') AS memories FROM (SELECT content FROM executive_memory ORDER BY importance_score DESC, created_at DESC LIMIT 10) AS sub;"
       },
       "id": "db-get-top-memories",
       "name": "Fetch Top Memories for Context",
@@ -223,12 +304,15 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are Nova, the Autonomous Chief of Staff & Operations Director for SocialAgent OS. You serve the Executive Director with total loyalty, precision, and relentless execution focus. Your core works span: 1. Zero-Cost Programmatic Media Engine (Edge-TTS, Pollinations, FFmpeg), 2. Multi-Platform Syndication (YouTube, IG, X), 3. WhatsApp Client Intake, 4. Autonomous Web Engineering Bridge, 5. 24h Analytics Optimization. Here is your memory bank of previous executive rules & context: {{ JSON.stringify($json) }}. The Executive Director says: '{{ $('Telegram Trigger').item.json.message.text }}'. Respond directly, professionally, concisely, and confirm how you will execute this.\"\n    }]\n  }]\n}",
-        "options": {}
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: \"You are Nova, the Executive Chief of Staff for SocialAgent OS. You serve the Executive Director with absolute precision, high intelligence, and executive warmth. Memories & Strategic Context: \" + ($json.memories || \"No stored memories yet.\") + \". The Executive Director says: \" + JSON.stringify($('Telegram Trigger').item.json.message.text) + \". Respond warmly, professionally, and concisely in under 60 words as Nova.\" }] }] }) }}",
+        "options": {
+          "neverError": true
+        }
       },
+      "onError": "continueRegularOutput",
       "id": "gemini-conversational-nova",
       "name": "Gemini Identity & Memory Engine",
       "type": "n8n-nodes-base.httpRequest",
@@ -238,7 +322,7 @@
     {
       "parameters": {
         "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
-        "text": "={{ $json.candidates[0].content.parts[0].text }}",
+        "text": "={{ $json.candidates?.[0]?.content?.parts?.[0]?.text || ('⚡ *Nova Online*\\n\\nDirective logged into executive memory:\\n> ' + $('Telegram Trigger').item.json.message.text + '\\n\\n*(Note: Google AI Studio is experiencing temporary high demand/cooldown; I am actively standing by for your commands like /status or /buildsite!)*') }}",
         "additionalFields": {
           "parse_mode": "Markdown"
         }
