@@ -29,7 +29,7 @@ conns_str = json.dumps(wf['connections'])
 settings_str = json.dumps({"executionOrder": "v1", "saveDataSuccessExecution": "all", "saveDataErrorExecution": "all"})
 
 if row:
-    cur.execute("UPDATE workflow_entity SET nodes = ?, connections = ?, active = 1, updatedAt = ? WHERE id = ?", (nodes_str, conns_str, now, wf_id))
+    cur.execute("UPDATE workflow_entity SET nodes = ?, connections = ?, settings = ?, active = 1, updatedAt = ? WHERE id = ?", (nodes_str, conns_str, settings_str, now, wf_id))
     cur.execute("UPDATE workflow_history SET nodes = ?, connections = ?, updatedAt = ? WHERE versionId = ?", (nodes_str, conns_str, now, version_id))
 else:
     cur.execute("""

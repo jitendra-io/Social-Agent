@@ -42,7 +42,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $json.body || {};\ntry {\n  const entries = body.entry || [];\n  for (const entry of entries) {\n    const changes = entry.changes || [];\n    for (const change of changes) {\n      if (change.field === 'comments') {\n        const val = change.value || {};\n        const myId = $env.INSTAGRAM_ACCOUNT_ID;\n        \n        // Prevent replying to own account comments\n        if (val.from && val.from.id !== myId && val.text) {\n          return [{\n            json: {\n              comment_id: val.id,\n              comment_text: val.text,\n              from_username: val.from.username || 'user',\n              from_id: val.from.id,\n              media_id: val.media ? val.media.id : null\n            }\n          }];\n        }\n      }\n    }\n  }\n} catch (e) {}\nreturn [];"
+        "jsCode": "const body = $json.body || {};\ntry {\n  const entries = body.entry || [];\n  for (const entry of entries) {\n    const changes = entry.changes || [];\n    for (const change of changes) {\n      if (change.field === 'comments') {\n        const val = change.value || {};\n        const myId = '17841425833721941';\n        \n        // Prevent replying to own account comments\n        if (val.from && String(val.from.id) !== String(myId) && val.text) {\n          return [{\n            json: {\n              comment_id: val.id,\n              comment_text: val.text,\n              from_username: val.from.username || 'user',\n              from_id: val.from.id,\n              media_id: val.media ? val.media.id : null\n            }\n          }];\n        }\n      }\n    }\n  }\n} catch (e) {\n  console.error('Parse error:', e);\n}\nreturn [];"
       },
       "id": "parse-ig-comment",
       "name": "Parse Reel Comment",
@@ -70,7 +70,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rawReply = $json.candidates?.[0]?.content?.parts?.[0]?.text;\nconst fallback = 'Thanks for tuning in! Appreciate your support 🚀';\nconst reply = (rawReply || fallback).trim().replace(/^\"|\"$/g, '');\n\nconst item = $('Parse Reel Comment').item.json;\nreturn {\n  comment_id: item.comment_id,\n  comment_text: item.comment_text,\n  from_username: item.from_username,\n  from_id: item.from_id,\n  media_id: item.media_id,\n  reply_text: reply\n};"
+        "jsCode": "const rawReply = $json.candidates?.[0]?.content?.parts?.[0]?.text;\nconst fallback = 'Thanks for tuning in! Appreciate your support 🚀';\nconst reply = (rawReply || fallback).trim().replace(/^\"|\"$/g, '');\n\nlet item = {};\ntry {\n  item = $('Parse Reel Comment').item.json;\n} catch (e) {\n  item = $('Parse Reel Comment').first().json;\n}\n\nreturn {\n  comment_id: item.comment_id,\n  comment_text: item.comment_text,\n  from_username: item.from_username,\n  from_id: item.from_id,\n  media_id: item.media_id,\n  reply_text: reply\n};"
       },
       "id": "format-reply-clean",
       "name": "Clean & Format Reply",
@@ -85,8 +85,11 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"message\": \"{{ $json.reply_text }}\",\n  \"access_token\": \"{{ $env.INSTAGRAM_ACCESS_TOKEN }}\"\n}",
-        "options": {}
+        "options": {
+          "neverError": true
+        }
       },
+      "onError": "continueRegularOutput",
       "id": "post-ig-reply",
       "name": "Post Reply to Instagram",
       "type": "n8n-nodes-base.httpRequest",
