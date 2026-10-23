@@ -18,6 +18,54 @@
     {
       "parameters": {
         "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.callback_query !== undefined }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-callback-query",
+      "name": "Is Callback Query?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [280, 360]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/tg-webhook-callbacks/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-telegram-bot-api-secret-token",
+              "value": "lHzSdAxS3MBlM7nL_tg-callback-trigger"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "neverError": true
+        }
+      },
+      "onError": "continueRegularOutput",
+      "id": "forward-callback-query",
+      "name": "Forward Callback to Handler",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
           "number": [
             {
               "value1": "={{ $json.message.from.id }}",
@@ -337,6 +385,24 @@
   "connections": {
     "Telegram Trigger": {
       "main": [
+        [
+          {
+            "node": "Is Callback Query?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Callback Query?": {
+      "main": [
+        [
+          {
+            "node": "Forward Callback to Handler",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Admin Security Gate",

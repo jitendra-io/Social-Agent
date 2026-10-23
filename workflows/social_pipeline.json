@@ -90,36 +90,40 @@
         "inlineKeyboard": {
           "rows": [
             {
-              "row": [
-                {
-                  "text": "✅ Approve & Post",
-                  "additionalFields": {
-                    "callback_data": "=approve_{{ $json.post_id }}"
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Approve & Post",
+                    "additionalFields": {
+                      "callback_data": "=approve_{{ $json.post_id }}"
+                    }
+                  },
+                  {
+                    "text": "✏️ Edit Caption",
+                    "additionalFields": {
+                      "callback_data": "=edit_{{ $json.post_id }}"
+                    }
                   }
-                },
-                {
-                  "text": "✏️ Edit Caption",
-                  "additionalFields": {
-                    "callback_data": "=edit_{{ $json.post_id }}"
-                  }
-                }
-              ]
+                ]
+              }
             },
             {
-              "row": [
-                {
-                  "text": "🔄 Regenerate",
-                  "additionalFields": {
-                    "callback_data": "=regen_{{ $json.post_id }}"
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🔄 Regenerate",
+                    "additionalFields": {
+                      "callback_data": "=regen_{{ $json.post_id }}"
+                    }
+                  },
+                  {
+                    "text": "💡 Suggest Next Step",
+                    "additionalFields": {
+                      "callback_data": "=suggest_{{ $json.post_id }}"
+                    }
                   }
-                },
-                {
-                  "text": "💡 Suggest Next Step",
-                  "additionalFields": {
-                    "callback_data": "=suggest_{{ $json.post_id }}"
-                  }
-                }
-              ]
+                ]
+              }
             }
           ]
         },
